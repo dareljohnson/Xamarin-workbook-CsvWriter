@@ -1,0 +1,223 @@
+---
+uti: com.xamarin.workbook
+id: b0021ef4-3720-427c-a8b0-d168a9d52553
+title: CsvWriter
+platforms:
+- DotNetCore
+---
+
+```csharp
+public class Person
+{
+    public int Id { get; set; }
+    public string Name { get; set; }
+    public string Lastname { get; set; }
+}
+```
+
+```csharp
+using System;
+
+public abstract class CsvableBase
+{
+    public virtual string ToCsv(bool ignoreComma = false)
+    {
+        string output = "";
+
+        var properties = GetType().GetProperties();
+
+        for (var i = 0; i < properties.Length; i++)
+        {
+            output += PreProcess(properties[i].GetValue(this).ToString(), ignoreComma);
+            if (i != properties.Length - 1)
+            {
+                output += ",";
+            }
+        }
+
+        return output;
+    }
+
+    public virtual string ToCsv(string[] propertyNames, bool isIgnore)
+    {
+        string output = "";
+        bool isFirstPropertyWritten = false;
+        
+
+        var properties = GetType().GetProperties();
+
+        for (var i = 0; i < properties.Length; i++)
+        {
+            if (isIgnore)
+            {
+                if (!propertyNames.Contains(properties[i].Name))
+                {
+                    if (isFirstPropertyWritten)
+                    {
+                        output += ",";
+                    }
+
+                    if (properties[i].PropertyType
+                        .IsSubclassOf(typeof(CsvableBase)))
+                    {
+                        var m = properties[i].PropertyType
+                        .GetMethod("ToCsv", new Type[0]);
+                        output += m.Invoke(properties[i].GetValue(this),
+                                            new object[0]);
+                    }
+                    else
+                    {
+                        output += PreProcess(properties[i]
+                                    .GetValue(this).ToString());
+                    }
+
+                    if (!isFirstPropertyWritten)
+                    {
+                        isFirstPropertyWritten = true;
+                    }
+                }
+            }
+            else
+            {
+                if (propertyNames.Contains(properties[i].Name))
+                {
+                    if (isFirstPropertyWritten)
+                    {
+                        output += ",";
+                    }
+
+                    if (properties[i].PropertyType
+                    .IsSubclassOf(typeof(CsvableBase)))
+                    {
+                        var m = properties[i].PropertyType
+                                .GetMethod("ToCsv", new Type[0]);
+                        output += m.Invoke(properties[i].GetValue(this),
+                                            new object[0]);
+                    }
+                    else
+                    {
+                        output += PreProcess(properties[i]
+                                    .GetValue(this).ToString());
+                    }
+
+                    if (!isFirstPropertyWritten)
+                    {
+                        isFirstPropertyWritten = true;
+                    }
+                }
+            }
+        }
+
+        return output;
+    }
+
+    
+    private string PreProcess(string input, bool ignoreComma = false)
+    {
+         input = input.Replace('ı', 'i')
+            .Replace('ç', 'c')
+            .Replace('ö', 'o')
+            .Replace('ş', 's')
+            .Replace('ü', 'u')
+            .Replace('ğ', 'g')
+            .Replace('İ', 'I')
+            .Replace('Ç', 'C')
+            .Replace('Ö', 'O')
+            .Replace('Ş', 'S')
+            .Replace('Ü', 'U')
+            .Replace('Ğ', 'G')
+            .Replace('"', '"')
+            .Replace("|","")
+            .Replace(","," ")
+            .Trim();
+        if (input.Contains(",") && ignoreComma == false)
+        {
+            input = '"' + input + '"';
+        }
+        return input;
+    }
+}
+```
+
+```csharp
+public class Person : CsvableBase
+{
+    public Person(int id, string name, string lastname)
+    {
+        Id = id;
+        Name = name;
+        Lastname = lastname;
+    }
+
+    public int Id { get; set; }
+    public string Name { get; set; }
+    public string Lastname { get; set; }
+}
+```
+
+```csharp
+public class Address : CsvableBase
+{
+    public Address(string city, string country)
+    {
+        City = city;
+        Country = country;
+    }
+    public string City { get; set; }
+    public string Country { get; set; }
+}
+```
+
+```csharp
+using System.IO;
+
+public class CsvWriter<T> where T : CsvableBase
+{
+	public string WriteRecords(IEnumerable<T> objects, bool ignoreComma = false)
+	{
+        string output = string.Empty;
+		var objs = objects as IList<T> ?? objects.ToList();
+		if (objs.Any())
+		{
+            foreach (var obj in objs)
+            {
+                output += obj.ToCsv(ignoreComma) + "\n";
+            }
+		}
+        return output;
+	}
+
+    public string WriteRecords(IEnumerable<T> objects, string[] propertyNames, bool ignore = false)
+	{
+        string output = string.Empty;
+		var objs = objects as IList<T> ?? objects.ToList();
+		if (objs.Any())
+		{
+            foreach (var obj in objs)
+            {
+                output += obj.ToCsv(propertyNames, ignore) + "\n";
+            }
+		}
+        return output;
+	}
+}
+```
+
+```csharp
+var p = new List<Person>();
+
+p.Add(new Person(1,"Hello, world!","İĞÜÇÖıüşöç"));
+p.Add(new Person(2,"Darel","Johnson"));
+p.Add(new Person(3,"Bruce","Wills"));
+p.Add(new Person(4,"Sue|| Ann","Downs"));
+
+var cw = new CsvWriter<Person>();
+
+var addresses = new List<Address>();
+addresses.Add(new Address("Loganville","US"));
+var cw2 = new CsvWriter<Address>();
+
+Console.WriteLine(cw.WriteRecords(p, true)); 
+
+Console.WriteLine(cw2.WriteRecords(addresses, new []{"City"}, true )); 
+```
